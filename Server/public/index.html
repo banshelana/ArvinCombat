@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no">
+    <title>Arvin Combat</title>
+    <style>
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0d0f14; }
+      #unity-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: #0d0f14; outline: none; }
+      #loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                background: radial-gradient(circle at 50% 40%, #1d2230 0%, #0d0f14 70%); color: #eee;
+                font-family: "Segoe UI", Arial, sans-serif; transition: opacity .4s; }
+      #loader .title { font-size: 56px; font-weight: 800; letter-spacing: 6px; margin-bottom: 8px; }
+      #loader .sub { font-size: 16px; color: #9aa0ad; margin-bottom: 36px; }
+      #loader .bar { width: min(420px, 80vw); height: 10px; background: #000a; border-radius: 6px; overflow: hidden; }
+      #loader .fill { width: 0%; height: 100%; background: linear-gradient(90deg, #f2731d, #f2a51d); transition: width .2s; }
+      #loader .pct { margin-top: 12px; font-size: 14px; color: #9aa0ad; }
+      #error { position: fixed; left: 50%; top: 20px; transform: translateX(-50%); background: #a12; color: #fff; padding: 10px 18px;
+               border-radius: 6px; font-family: Arial, sans-serif; display: none; z-index: 10; }
+    </style>
+  </head>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+    <div id="loader">
+      <div class="title">ARVIN COMBAT</div>
+      <div class="sub">Choose your warrior. Win fights. Grow stronger.</div>
+      <div class="bar"><div class="fill" id="fill"></div></div>
+      <div class="pct" id="pct">Loading...</div>
+    </div>
+    <div id="error"></div>
+    <script src="Build/public.loader.js"></script>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      // right click is used for blocking: never open the browser menu over the game
+      canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+      canvas.addEventListener("mousedown", function () { canvas.focus(); });
+
+      createUnityInstance(canvas, {
+        arguments: [],
+        dataUrl: "Build/public.data.gz",
+        frameworkUrl: "Build/public.framework.js.gz",
+        codeUrl: "Build/public.wasm.gz",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "Arvin Games",
+        productName: "Arvin Combat",
+        productVersion: "1.0",
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+      }, function (progress) {
+        var p = Math.round(progress * 100);
+        document.getElementById("fill").style.width = p + "%";
+        document.getElementById("pct").textContent = p < 100 ? "Loading... " + p + "%" : "Starting...";
+      }).then(function () {
+        var l = document.getElementById("loader");
+        l.style.opacity = 0;
+        setTimeout(function () { l.style.display = "none"; }, 450);
+        canvas.focus();
+      }).catch(function (message) {
+        var e = document.getElementById("error");
+        e.textContent = message;
+        e.style.display = "block";
+      });
+    </script>
+  </body>
+</html>

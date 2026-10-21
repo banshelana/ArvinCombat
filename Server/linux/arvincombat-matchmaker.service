@@ -1,0 +1,17 @@
+[Unit]
+Description=ArvinCombat matchmaker (Arvin Games, game3)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/arvinplay/games/game3/matchmaker
+ExecStart=/usr/bin/dotnet /arvinplay/games/game3/matchmaker/ArvinCombat.MatchService.dll
+Restart=always
+RestartSec=3
+# the secret shared by the matchmaker and its rooms (overrides appsettings.json, keep it out of files you share)
+Environment=ArvinCombat__RoomSecret=CHANGE_ME_TO_A_LONG_RANDOM_STRING
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=ArvinCombat game server (web game + online battles)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/arvincombat
+ExecStart=/usr/bin/env node /opt/arvincombat/arvincombat-server.js
+Environment=PORT=8090
+Environment=PUBLIC_DIR=/opt/arvincombat/public
+Restart=always
+RestartSec=3
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target
