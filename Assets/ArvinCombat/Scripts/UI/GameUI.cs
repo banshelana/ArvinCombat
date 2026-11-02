@@ -109,7 +109,7 @@ namespace ArvinCombat
             var sub = UIKit.MakeLabel(s, "Choose your warrior. Win fights. Grow stronger.", 34, TextAnchor.MiddleCenter, UIKit.Muted);
             sub.rectTransform.Place(new Vector2(0.5f, 1f), new Vector2(1600, 60), new Vector2(0, -240));
 
-            var panel = UIKit.MakeImage(s, "Menu", UIKit.Panel).rectTransform.Place(new Vector2(0.5f, 0.42f), new Vector2(640, 600), Vector2.zero);
+            var panel = UIKit.MakeImage(s, "Menu", UIKit.Panel).rectTransform.Place(new Vector2(0.5f, 0.4f), new Vector2(640, 700), Vector2.zero);
             UIKit.VLayout(panel.gameObject, 16, 30);
 
             var nameLbl = UIKit.MakeLabel(panel, "Your fighter name", 26, TextAnchor.MiddleCenter, UIKit.Muted);
@@ -119,19 +119,49 @@ namespace ArvinCombat
             input.onEndEdit.AddListener(v => gm.SetPlayerName(v));
             input.interactable = !gm.NameFromSite; // logged-in players use their site name
 
-            var xp = UIKit.MakeLabel(panel, $"XP Power: <color=#{UIKit.Hex(UIKit.Accent)}>{gm.profile.xp}</color>     Wins: {gm.profile.wins}", 28, TextAnchor.MiddleCenter);
-            UIKit.Size(xp, 40);
+            _coinsLabel = UIKit.MakeLabel(panel, CoinsLine(), 28, TextAnchor.MiddleCenter);
+            UIKit.Size(_coinsLabel, 40);
 
             UIKit.Size(UIKit.MakeButton(panel, "OFFLINE  -  CAMPAIGN", () => { gm.SetPlayerName(input.text); gm.ChooseMode(PlayMode.Campaign); }, UIKit.Accent * 0.8f), 76);
             UIKit.Size(UIKit.MakeButton(panel, "ONLINE  -  1 VS 1", () => { gm.SetPlayerName(input.text); gm.OpenOnline(); }), 76);
             UIKit.Size(UIKit.MakeButton(panel, "QUICK FIGHT", () => { gm.SetPlayerName(input.text); gm.ChooseMode(PlayMode.QuickFight); }), 76);
             UIKit.Size(UIKit.MakeButton(panel, "UPGRADE WARRIORS", () => { gm.SetPlayerName(input.text); gm.OpenUpgrades(false); }), 76);
+            var row = UIKit.Rect(panel, "ShopRow");
+            UIKit.Size(row, 76);
+            UIKit.HLayout(row.gameObject, 16, 0);
+            UIKit.MakeButton(row, "SHOP", () => { gm.SetPlayerName(input.text); ShowShop("warriors"); }, new Color(0.15f, 0.35f, 0.2f, 1f));
+            UIKit.MakeButton(row, "ACHIEVEMENTS", () => { gm.SetPlayerName(input.text); ShowAchievements(); }, new Color(0.3f, 0.22f, 0.4f, 1f));
+        }
+
+        Text _coinsLabel;
+
+        string CoinsLine()
+        {
+            var sv = gm.services;
+            string coins = sv != null && gm.platform != null && gm.platform.Ready ? sv.Coins.ToString() : "...";
+            return $"XP Power: <color=#{UIKit.Hex(UIKit.Accent)}>{gm.profile.xp}</color>    Coins: <color=#FFD54A>{coins}</color>    Wins: {gm.profile.wins}";
+        }
+
+        /// <summary>Shop / achievements / coins changed: refresh the screen that shows them.</summary>
+        public void OnServicesChanged()
+        {
+            switch (CurrentScreen)
+            {
+                case "main": if (_coinsLabel != null) _coinsLabel.text = CoinsLine(); break;
+                case "shop": ShowShop(_shopTab, _shopMsg); break;
+                case "achievements": ShowAchievements(); break;
+                case "select": ShowWarriorSelect(_selectSub); break;
+            }
         }
 
         // ------------------------------------------------------------ warrior select
 
+        string _selectSub = "";
+
         public void ShowWarriorSelect(string subtitle)
         {
+            _selectSub = subtitle;
+            var sv = gm.services;
             var s = NewScreen("select");
             var w = Window(s, new Vector2(1820, 1000), "CHOOSE YOUR WARRIOR");
             var sub = UIKit.MakeLabel(w, subtitle, 28, TextAnchor.MiddleCenter, UIKit.Muted);
@@ -151,9 +181,11 @@ namespace ArvinCombat
                 var card = UIKit.MakeImage(grid, d.displayName, UIKit.PanelLight);
                 var btn = card.gameObject.AddComponent<Button>();
                 btn.targetGraphic = card;
-                btn.onClick.AddListener(() => gm.SelectWarrior(d.id));
+                bool unlocked = sv == null || sv.WarriorUnlocked(d.id);
+                btn.onClick.AddListener(() => { if (unlocked) gm.SelectWarrior(d.id); else gm.UnlockWarrior(d.id); });
                 bool selected = (int)d.id == gm.profile.selectedWarrior;
-                if (selected) card.color = new Color(0.25f, 0.2f, 0.12f, 1f);
+                if (selected && unlocked) card.color = new Color(0.25f, 0.2f, 0.12f, 1f);
+                if (!unlocked) card.color = new Color(0.09f, 0.09f, 0.11f, 1f);
 
                 var stripe = UIKit.MakeImage(card.transform, "Stripe", d.uiColor);
                 stripe.rectTransform.anchorMin = new Vector2(0, 1); stripe.rectTransform.anchorMax = new Vector2(1, 1);
@@ -176,6 +208,41 @@ namespace ArvinCombat
                 StatMini(statRow, "POWER", stats.power / 1.8f);
                 StatMini(statRow, "SPEED", stats.speed / 1.6f);
                 StatMini(statRow, "DEFENSE", stats.defense / 0.6f);
+
+                if (!unlocked)
+                {
+                    var item = GameContent.Get().FindItem(GameContent.WarriorItem(d.id));
+                    int lvl = GameContent.WarriorFreeAtLevel(d.id);
+                    var shade = UIKit.MakeImage(card.transform, "Locked", new Color(0, 0, 0, 0.6f));
+                    shade.rectTransform.Stretch();
+                    shade.raycastTarget = false;
+                    string how = (item != null ? $"<color=#FFD54A>CLICK TO UNLOCK - {item.price} coins</color>" : "") +
+                                 (lvl >= 0 ? $"\n<size=22>or beat campaign level {lvl + 1} ({LevelDatabase.Levels[lvl].enemyName}) for free</size>" : "");
+                    var lk = UIKit.MakeLabel(shade.transform, "LOCKED\n" + how, 32, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                    lk.rectTransform.Stretch(10, 10, 10, 10);
+                    lk.raycastTarget = false;
+                }
+                else if (sv != null)
+                {
+                    // skins the player owns for this warrior: small button cycles default -> gold -> shadow
+                    var owned = new List<string> { "" };
+                    foreach (var st in GameContent.SkinStyles) if (sv.SkinOwned(d.id, st)) owned.Add(st);
+                    if (owned.Count > 1)
+                    {
+                        string cur = sv.EquippedSkin(d.id);
+                        int idx = Mathf.Max(0, owned.IndexOf(cur));
+                        string next = owned[(idx + 1) % owned.Count];
+                        var sb = UIKit.MakeButton(card.transform, "SKIN: " + (cur == "" ? "DEFAULT" : cur.ToUpper()), () => sv.EquipSkin(d.id, next),
+                            cur == "gold" ? new Color(0.5f, 0.38f, 0.1f, 1f) : cur == "shadow" ? new Color(0.2f, 0.15f, 0.3f, 1f) : UIKit.Panel, 20);
+                        sb.GetComponent<RectTransform>().Place(new Vector2(1f, 1f), new Vector2(210, 44), new Vector2(-12, -14));
+                    }
+                }
+            }
+
+            if (sv != null && !string.IsNullOrEmpty(_selectMsg))
+            {
+                var msg = UIKit.MakeLabel(w, _selectMsg, 26, TextAnchor.MiddleCenter, UIKit.Accent);
+                msg.rectTransform.Place(new Vector2(0.5f, 0f), new Vector2(1600, 36), new Vector2(0, 100));
             }
 
             var back = UIKit.MakeButton(w, "BACK", () => ShowMainMenu());
@@ -290,7 +357,7 @@ namespace ArvinCombat
                 int cost = PlayerProfile.UpgradeCost(rank);
                 var b = UIKit.MakeButton(row.transform, max ? "MAX" : $"+  ({cost} XP)", () =>
                 {
-                    if (gm.profile.TryUpgrade(id, stat)) ShowUpgrades(id);
+                    if (gm.profile.TryUpgrade(id, stat)) { gm.services?.Recheck(); ShowUpgrades(id); }
                 }, UIKit.Accent * 0.8f, 26);
                 b.interactable = !max && gm.profile.CanUpgrade(id, stat);
                 b.GetComponent<RectTransform>().Place(new Vector2(1f, 0.5f), new Vector2(300, 66), new Vector2(-20, 0));
@@ -320,12 +387,241 @@ namespace ArvinCombat
             UIKit.MakeButton(bar, searching ? "CANCEL" : "BACK", () => gm.CancelOnline());
         }
 
+        // ------------------------------------------------------------ shop
+
+        string _shopTab = "warriors", _shopMsg = "", _selectMsg = "", _resultMsg = "";
+        static readonly Color Gold = new Color(1f, 0.84f, 0.29f, 1f);
+
+        public void SetSelectMessage(string m) { _selectMsg = m ?? ""; if (CurrentScreen == "select") ShowWarriorSelect(_selectSub); }
+        public void SetResultMessage(string m) { _resultMsg = m ?? ""; }
+
+        public void ShowShop(string tab, string message = "")
+        {
+            _shopTab = string.IsNullOrEmpty(tab) ? "warriors" : tab;
+            _shopMsg = message ?? "";
+            var sv = gm.services;
+            var s = NewScreen("shop");
+            var w = Window(s, new Vector2(1560, 1000), "SHOP");
+
+            string note = gm.platform != null && gm.platform.IsGuest ? "   <size=22><color=#FF8A65>Sign in on the site to buy items and keep your progress.</color></size>"
+                        : gm.platform != null && gm.platform.Simulated ? "   <size=22>(test mode - simulated coins)</size>" : "";
+            var head = UIKit.MakeLabel(w, $"Arvin Coins: <color=#{UIKit.Hex(Gold)}><b>{(sv != null ? sv.Coins : 0)}</b></color>     XP Power: <color=#{UIKit.Hex(UIKit.Accent)}>{gm.profile.xp}</color>{note}", 30, TextAnchor.MiddleCenter);
+            head.rectTransform.Place(new Vector2(0.5f, 1f), new Vector2(1500, 46), new Vector2(0, -95));
+
+            var tabs = UIKit.Rect(w, "Tabs");
+            tabs.Place(new Vector2(0.5f, 1f), new Vector2(1200, 64), new Vector2(0, -155));
+            UIKit.HLayout(tabs.gameObject, 12, 0);
+            string[] ids = { "warriors", "skins", "xp", "continues" };
+            string[] names = { "WARRIORS", "SKINS", "XP POWER", "CONTINUES" };
+            for (int i = 0; i < ids.Length; i++)
+            {
+                string id = ids[i];
+                UIKit.MakeButton(tabs, names[i], () => ShowShop(id), id == _shopTab ? UIKit.Accent * 0.8f : UIKit.PanelLight, 26);
+            }
+
+            var area = UIKit.Rect(w, "Items").Stretch(50, 250, 50, 150);
+            if (sv == null) { UIKit.MakeLabel(area, "Shop is not available.", 30, TextAnchor.MiddleCenter, UIKit.Muted).rectTransform.Stretch(); }
+            else if (!sv.StoreReady && gm.platform != null && gm.platform.Ready && !gm.platform.IsGuest)
+                UIKit.MakeLabel(area, "Loading your items...", 30, TextAnchor.MiddleCenter, UIKit.Muted).rectTransform.Stretch();
+            else
+            {
+                var content = GameContent.Get();
+                switch (_shopTab)
+                {
+                    case "warriors":
+                    {
+                        UIKit.VLayout(area.gameObject, 14, 0);
+                        foreach (var d in WarriorDatabase.All)
+                        {
+                            string key = GameContent.WarriorItem(d.id);
+                            var it = key != null ? content.FindItem(key) : null;
+                            if (it == null) continue;
+                            int lvl = GameContent.WarriorFreeAtLevel(d.id);
+                            bool have = sv.WarriorUnlocked(d.id);
+                            ShopRow(area, 120, d.uiColor,
+                                $"<b>{d.displayName.ToUpper()}</b>\n<size=22><color=#{UIKit.Hex(UIKit.Muted)}>{d.description}" +
+                                (lvl >= 0 ? $"  Free when you beat level {lvl + 1}." : "") + "</color></size>",
+                                have ? "UNLOCKED" : "BUY  " + it.price, !have, () => BuyAndShow(it.key));
+                        }
+                        var free = UIKit.MakeLabel(area, "Karate Master, Boxer and Knight are free for everyone.", 24, TextAnchor.MiddleCenter, UIKit.Muted);
+                        UIKit.Size(free, 40);
+                        break;
+                    }
+                    case "skins":
+                    {
+                        var g = area.gameObject.AddComponent<GridLayoutGroup>();
+                        g.cellSize = new Vector2(720, 84);
+                        g.spacing = new Vector2(16, 10);
+                        g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                        g.constraintCount = 2;
+                        g.childAlignment = TextAnchor.UpperCenter;
+                        foreach (var d in WarriorDatabase.All)
+                            foreach (var st in GameContent.SkinStyles)
+                            {
+                                var it = content.FindItem(GameContent.SkinItem(d.id, st));
+                                if (it == null) continue;
+                                var wid = d.id; var style = st;
+                                bool have = sv.Owns(it.key);
+                                bool on = sv.EquippedSkin(wid) == style;
+                                string btn = !have ? "BUY  " + it.price : on ? "EQUIPPED" : "EQUIP";
+                                ShopRow(area, -1, st == "gold" ? Gold : new Color(0.55f, 0.4f, 0.8f, 1f),
+                                    $"<b>{d.displayName}</b>  <color=#{UIKit.Hex(st == "gold" ? Gold : new Color(0.7f, 0.6f, 0.95f))}>{st.ToUpper()}</color>",
+                                    btn, !on, () =>
+                                    {
+                                        if (sv.Owns(it.key)) sv.EquipSkin(wid, on ? "" : style);
+                                        else BuyAndShow(it.key);
+                                    });
+                            }
+                        break;
+                    }
+                    case "xp":
+                    {
+                        UIKit.VLayout(area.gameObject, 14, 0);
+                        foreach (var key in new[] { "xp_pack_small", "xp_pack_large" })
+                        {
+                            var it = content.FindItem(key);
+                            if (it == null) continue;
+                            ShopRow(area, 120, UIKit.Accent,
+                                $"<b>+{GameContent.XpPackAmount(key)} XP POWER</b>\n<size=22><color=#{UIKit.Hex(UIKit.Muted)}>Added right away. Spend it in UPGRADE WARRIORS on power, speed, health, defense and stamina.</color></size>",
+                                "BUY  " + it.price, true, () => BuyAndShow(it.key));
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        UIKit.VLayout(area.gameObject, 14, 0);
+                        var it = content.FindItem(GameContent.ContinueItem);
+                        if (it != null)
+                            ShopRow(area, 120, new Color(0.3f, 0.75f, 0.4f, 1f),
+                                $"<b>CAMPAIGN CONTINUE</b>   <size=24>You have <color=#{UIKit.Hex(UIKit.Accent)}>{sv.Continues}</color></size>\n<size=22><color=#{UIKit.Hex(UIKit.Muted)}>Lost a campaign fight? Continue it with your round score kept instead of starting over.</color></size>",
+                                "BUY  " + it.price, true, () => BuyAndShow(it.key));
+                        break;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_shopMsg) || (sv != null && sv.Buying))
+            {
+                var m = UIKit.MakeLabel(w, sv != null && sv.Buying ? "Waiting for the site..." : _shopMsg, 28, TextAnchor.MiddleCenter, UIKit.Accent);
+                m.rectTransform.Place(new Vector2(0.5f, 0f), new Vector2(1500, 40), new Vector2(0, 110));
+            }
+
+            var back = UIKit.MakeButton(w, "BACK", () => { _shopMsg = ""; ShowMainMenu(); });
+            back.GetComponent<RectTransform>().Place(new Vector2(0.5f, 0f), new Vector2(300, 70), new Vector2(0, 28));
+        }
+
+        void ShopRow(RectTransform parent, float height, Color stripe, string text, string button, bool enabled, UnityEngine.Events.UnityAction onClick)
+        {
+            var row = UIKit.MakeImage(parent, "Row", UIKit.PanelLight);
+            if (height > 0) UIKit.Size(row, height);
+            var st = UIKit.MakeImage(row.transform, "Stripe", stripe);
+            st.rectTransform.anchorMin = new Vector2(0, 0); st.rectTransform.anchorMax = new Vector2(0, 1);
+            st.rectTransform.pivot = new Vector2(0, 0.5f); st.rectTransform.sizeDelta = new Vector2(8, 0);
+            st.raycastTarget = false;
+            var t = UIKit.MakeLabel(row.transform, text, 30, TextAnchor.MiddleLeft);
+            t.rectTransform.Stretch(26, 4, 270, 4);
+            var b = UIKit.MakeButton(row.transform, button, onClick, enabled ? new Color(0.15f, 0.42f, 0.22f, 1f) : UIKit.Panel, 24);
+            b.interactable = enabled && (gm.services == null || !gm.services.Buying);
+            b.GetComponent<RectTransform>().Place(new Vector2(1f, 0.5f), new Vector2(230, height > 0 ? 64 : 58), new Vector2(-14, 0));
+        }
+
+        void BuyAndShow(string key)
+        {
+            var sv = gm.services;
+            if (sv == null) return;
+            sv.Buy(key, (ok, err) =>
+            {
+                var it = GameContent.Get().FindItem(key);
+                string name = it != null ? it.title.Get("en") : key;
+                if (CurrentScreen == "shop") ShowShop(_shopTab, ok ? name + " - done!" : ArvinServices.ErrorText(err));
+            });
+            if (CurrentScreen == "shop") ShowShop(_shopTab, "");
+        }
+
+        // ------------------------------------------------------------ achievements
+
+        public void ShowAchievements()
+        {
+            var sv = gm.services;
+            var s = NewScreen("achievements");
+            var w = Window(s, new Vector2(1700, 1000), "ACHIEVEMENTS");
+            var list = GameContent.Get().achievements;
+            int total = 0, done = 0;
+            foreach (var a in list) if (a.active) { total++; if (sv != null && sv.IsUnlocked(a.key)) done++; }
+            string note = gm.platform != null && gm.platform.IsGuest ? "   <size=22><color=#FF8A65>Guest: rewards are given when you sign in.</color></size>" : "";
+            var head = UIKit.MakeLabel(w, $"Unlocked <color=#{UIKit.Hex(UIKit.Accent)}><b>{done}</b></color> / {total}{note}", 30, TextAnchor.MiddleCenter);
+            head.rectTransform.Place(new Vector2(0.5f, 1f), new Vector2(1600, 46), new Vector2(0, -95));
+
+            var area = UIKit.Rect(w, "Grid").Stretch(30, 160, 30, 120);
+            var g = area.gameObject.AddComponent<GridLayoutGroup>();
+            g.cellSize = new Vector2(536, 112);
+            g.spacing = new Vector2(12, 10);
+            g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            g.constraintCount = 3;
+            g.childAlignment = TextAnchor.UpperCenter;
+
+            foreach (var a in list)
+            {
+                if (!a.active) continue;
+                bool got = sv != null && sv.IsUnlocked(a.key);
+                bool secret = a.hidden && !got;
+                var cell = UIKit.MakeImage(area, a.key, got ? new Color(0.2f, 0.17f, 0.1f, 1f) : UIKit.PanelLight);
+                var st = UIKit.MakeImage(cell.transform, "Stripe", got ? Gold : new Color(0.3f, 0.3f, 0.35f, 1f));
+                st.rectTransform.anchorMin = new Vector2(0, 0); st.rectTransform.anchorMax = new Vector2(0, 1);
+                st.rectTransform.pivot = new Vector2(0, 0.5f); st.rectTransform.sizeDelta = new Vector2(8, 0);
+
+                string state;
+                if (got) state = $"<color=#{UIKit.Hex(Gold)}>UNLOCKED</color>";
+                else if (a.Target > 0) state = $"{Mathf.Min(sv != null ? sv.ProgressOf(a.key) : 0, a.Target)} / {a.Target}";
+                else if (!a.FromGame) state = "<size=18>tracked by the site</size>";
+                else state = "locked";
+                string title = secret ? "???" : a.title.Get("en");
+                string desc = secret ? "Hidden achievement" : a.description.Get("en");
+                var t = UIKit.MakeLabel(cell.transform,
+                    $"<b>{title}</b>\n<size=20><color=#{UIKit.Hex(UIKit.Muted)}>{desc}</color></size>", 26, TextAnchor.UpperLeft, got ? Color.white : UIKit.TextColor);
+                t.rectTransform.Stretch(22, 10, 130, 8);
+                var r = UIKit.MakeLabel(cell.transform, $"{state}\n<size=20><color=#{UIKit.Hex(Gold)}>+{a.coinReward} coins</color></size>", 22, TextAnchor.MiddleRight);
+                r.rectTransform.Stretch(380, 6, 14, 6);
+            }
+
+            var back = UIKit.MakeButton(w, "BACK", () => ShowMainMenu());
+            back.GetComponent<RectTransform>().Place(new Vector2(0.5f, 0f), new Vector2(300, 70), new Vector2(0, 28));
+            if (sv != null && CurrentScreen == "achievements" && !_achRefreshing)
+            {
+                _achRefreshing = true;
+                sv.RefreshAchievements(() => _achRefreshing = false);
+            }
+        }
+
+        bool _achRefreshing;
+
+        /// <summary>Small message at the bottom of the screen (achievement unlocked outside the site, etc.).</summary>
+        public void Toast(string text)
+        {
+            if (_toast == null)
+            {
+                _toast = UIKit.MakeLabel(_fxRoot, "", 36, TextAnchor.MiddleCenter, Gold, FontStyle.Bold);
+                _toast.rectTransform.Place(new Vector2(0.5f, 0f), new Vector2(1600, 70), new Vector2(0, 140));
+                _toast.gameObject.AddComponent<Outline>().effectDistance = new Vector2(3, -3);
+            }
+            _toast.text = text;
+            _toastUntil = Time.unscaledTime + 3.5f;
+        }
+
+        Text _toast;
+        float _toastUntil;
+
         // ------------------------------------------------------------ result / pause
 
-        public void ShowResult(MatchResult r, int xpGained, bool canNext, string extra)
+        public void ShowResult(MatchResult r, int xpGained, bool canNext, string extra, bool canContinue = false)
         {
             var s = NewScreen("result");
-            var w = Window(s, new Vector2(1000, 640), r.playerWon ? "VICTORY" : "DEFEAT");
+            var w = Window(s, new Vector2(canContinue ? 1100 : 1000, 640), r.playerWon ? "VICTORY" : "DEFEAT");
+            if (!string.IsNullOrEmpty(_resultMsg))
+            {
+                var m = UIKit.MakeLabel(w, _resultMsg, 24, TextAnchor.MiddleCenter, UIKit.Accent);
+                m.rectTransform.Place(new Vector2(0.5f, 0f), new Vector2(1000, 34), new Vector2(0, 124));
+            }
             var body = Body(w, 120, 140);
             UIKit.VLayout(body.gameObject, 16, 10);
             UIKit.MakeLabel(body, $"Rounds  {r.playerRounds} - {r.enemyRounds}", 40, TextAnchor.MiddleCenter, UIKit.TextColor, FontStyle.Bold);
@@ -333,9 +629,17 @@ namespace ArvinCombat
             UIKit.MakeLabel(body, $"Total XP Power: {gm.profile.xp}\n{extra}", 28, TextAnchor.MiddleCenter, UIKit.Muted);
 
             var bar = UIKit.Rect(w, "Buttons");
-            bar.Place(new Vector2(0.5f, 0f), new Vector2(920, 76), new Vector2(0, 30));
+            bar.Place(new Vector2(0.5f, 0f), new Vector2(canContinue ? 960 : 920, 76), new Vector2(0, 30));
             UIKit.HLayout(bar.gameObject, 16, 0);
             if (canNext) UIKit.MakeButton(bar, "NEXT LEVEL", () => gm.NextLevel(), UIKit.Accent * 0.8f);
+            if (canContinue && gm.services != null)
+            {
+                int left = gm.services.Continues;
+                var item = GameContent.Get().FindItem(GameContent.ContinueItem);
+                string label = left > 0 ? $"CONTINUE ({left})" : $"CONTINUE - {(item != null ? item.price : 15)} coins";
+                var cb = UIKit.MakeButton(bar, label, () => gm.ContinueFight(), new Color(0.15f, 0.4f, 0.2f, 1f), 26);
+                cb.interactable = !gm.services.Buying;
+            }
             UIKit.MakeButton(bar, r.playerWon ? "FIGHT AGAIN" : "RETRY", () => gm.Retry());
             UIKit.MakeButton(bar, "UPGRADES", () => { gm.ReturnToMenuScene(); gm.OpenUpgrades(gm.mode == PlayMode.Campaign); });
             UIKit.MakeButton(bar, "MENU", () => gm.BackToMenu());
@@ -365,7 +669,7 @@ namespace ArvinCombat
             _timer.gameObject.AddComponent<Outline>().effectDistance = new Vector2(3, -3);
 
             _hint = UIKit.MakeLabel(_hudRoot,
-                "WASD  move     CLICK + A/D/W/S  attacks     Q + A/D/W/S  kicks     HOLD RIGHT  block     DOUBLE RIGHT  dodge     LEFT + RIGHT  special     SPACE  jump",
+                "MOUSE  camera     WASD  move     CLICK + A/D/W/S  attacks     Q + A/D/W/S  kicks     HOLD RIGHT  block     DOUBLE RIGHT  dodge     LEFT + RIGHT  special     SPACE  jump",
                 22, TextAnchor.MiddleCenter, new Color(1, 1, 1, 0.65f));
             _hint.rectTransform.Place(new Vector2(0.5f, 0f), new Vector2(1900, 40), new Vector2(0, 12));
 
@@ -537,6 +841,7 @@ namespace ArvinCombat
 
         void Update()
         {
+            if (_toast != null && _toast.text.Length > 0 && Time.unscaledTime > _toastUntil) _toast.text = "";
             if (_center != null && _center.text.Length > 0)
             {
                 float left = _centerUntil - Time.unscaledTime;

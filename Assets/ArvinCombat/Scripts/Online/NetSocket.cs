@@ -134,6 +134,8 @@ namespace ArvinCombat
         public int side;
         public string oppName;
         public int oppWarrior;
+        public string skin;       // cosmetic skin of the sender ("", "gold", "shadow")
+        public string oppSkin;
         public int[] oppRanks;
         public int oppRating;
         public int rounds;

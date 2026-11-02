@@ -14,9 +14,11 @@
 | Action | Input |
 |---|---|
 | Move (runs automatically when closing in) | W A S D |
+| Camera (turn around your fighter / look up-down, scroll = zoom) | Mouse (captured during fights; Esc frees it) |
 | Left / Right / Front / Back attack | Left click + A / D / W / S (no key = front) |
 | Left / Right / Front / Back kick (or the warrior's own Q set) | Q + A / D / W / S |
 | Block / Parry (press just before the hit) | Hold right click |
+| Escape a flinch (half way through) | Double right click (dodge) or hold right click (block) |
 | Dodge roll (toward WASD direction, backwards if none) | Double right click |
 | Special (when the blue bar is full) | Left + right click together |
 | Jump (attack in the air = jump attack) | Space |
@@ -72,4 +74,3 @@ Built for the Arvin Games site (game runs in an iframe on `https://playsite.arvi
 - **Matchmaker** - `Server/MatchService/publish-match-service.bat` → `/arvinplay/games/game3/matchmaker/`.
 - Uses `window.GamePlatform` for the player name, pause/resume and gameplay events; works without it in the Editor.
 Win online: +60 XP, loss: +15 XP. Leaving a match counts as a loss.
-"# ArvinCombat" 

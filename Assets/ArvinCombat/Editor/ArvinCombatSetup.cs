@@ -26,7 +26,7 @@ namespace ArvinCombat.EditorTools
         const string ResDir = Root + "/Resources/ArvinCombat";
         const string RegistryPath = ResDir + "/WarriorRegistry.asset";
         const string ScenePath = Root + "/Scenes/Main.unity";
-        public const int SetupVersion = 5; // v2: jump clips, v3: online + web, v4: 8 directional moves
+        public const int SetupVersion = 6; // v2: jump clips, v3: online + web, v4: 8 directional moves
         const string WebBuildDir = "Builds/WebGL";                          // web client (upload to the host)
         const string RoomBuildPath = "Builds/RoomServer/ArvinCombatRoom.x86_64"; // Linux dedicated room server
 
@@ -354,7 +354,7 @@ namespace ArvinCombat.EditorTools
                 }
 
                 // textures: small and crunched on WebGL
-                var texGuids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/ExplosiveLLC", "Assets/ARPGWarrior", "Assets/SamuraiAnimsetPro", "Assets/Fantacode Studios" });
+                var texGuids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/ExplosiveLLC", "Assets/ARPGWarrior", "Assets/SamuraiAnimsetPro", "Assets/Fantacode Studios", "Assets/MOBA and Tower Defense" });
                 foreach (var g in texGuids)
                 {
                     var path = AssetDatabase.GUIDToAssetPath(g);
@@ -694,8 +694,15 @@ namespace ArvinCombat.EditorTools
             camGo.transform.position = new Vector3(0, 5, -12);
             camGo.transform.LookAt(Vector3.up);
 
-            // arena (primitives only = tiny download)
             var arena = new GameObject("Arena").transform;
+            if (RuinsArena.Available())
+            {
+                // abandoned ruins arena from the Tower Defense and MOBA props
+                RuinsArena.Build(arena, light, cam);
+            }
+            else
+            {
+            // arena (primitives only = tiny download)
             var stone = Mat("Arena_Stone", new Color(0.42f, 0.40f, 0.37f), 0.15f);
             var stoneDark = Mat("Arena_StoneDark", new Color(0.24f, 0.22f, 0.21f), 0.1f);
             var sand = Mat("Arena_Sand", new Color(0.58f, 0.50f, 0.38f), 0.05f);
@@ -723,6 +730,7 @@ namespace ArvinCombat.EditorTools
                 Prim(PrimitiveType.Cylinder, "Pillar" + i, arena, pos, new Vector3(0.9f, 1.8f, 0.9f), stoneDark);
                 Prim(PrimitiveType.Cube, "Fire" + i, arena, pos + Vector3.up * 1.95f, new Vector3(0.5f, 0.3f, 0.5f), fire, new Vector3(0, 45, 0));
                 Prim(PrimitiveType.Cube, "Banner" + i, arena, pos + new Vector3(0, 0.3f, 0) - pos.normalized * 0.46f, new Vector3(0.6f, 2.2f, 0.04f), accent, new Vector3(0, a * Mathf.Rad2Deg, 0));
+            }
             }
 
             // game objects

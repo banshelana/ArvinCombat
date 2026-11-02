@@ -39,6 +39,7 @@ namespace ArvinCombat
         bool _fighting;
         int _side;
         int _myScore, _oppScore, _need = 2;
+        public FightStats Stats { get; private set; } = new FightStats();
         float _roundTime = 75f;
         string _oppName = "";
         PlayerProfile _profile;
@@ -121,7 +122,7 @@ namespace ArvinCombat
                 if (rs == 1 && !_roomHello)
                 {
                     var ranks = _profile.GetRanks((WarriorId)_profile.selectedWarrior);
-                    Send(new NetMsg { t = "hello", ticket = _ticket, playerId = _playerId, name = _profile.playerName, warrior = _profile.selectedWarrior, ranks = ranks, ver = ProtocolVersion });
+                    Send(new NetMsg { t = "hello", ticket = _ticket, playerId = _playerId, name = _profile.playerName, warrior = _profile.selectedWarrior, skin = _profile.equippedSkins[_profile.selectedWarrior], ranks = ranks, ver = ProtocolVersion });
                     _roomHello = true;
                     _pingTimer = 20f;
                 }
@@ -147,7 +148,7 @@ namespace ArvinCombat
                     if (st == 1)
                     {
                         var ranks = _profile.GetRanks((WarriorId)_profile.selectedWarrior);
-                        Send(new NetMsg { t = "hello", playerId = _playerId, name = _profile.playerName, warrior = _profile.selectedWarrior, ranks = ranks, ver = ProtocolVersion });
+                        Send(new NetMsg { t = "hello", playerId = _playerId, name = _profile.playerName, warrior = _profile.selectedWarrior, skin = _profile.equippedSkins[_profile.selectedWarrior], ranks = ranks, ver = ProtocolVersion });
                         Send(new NetMsg { t = "queue" });
                         _phase = Phase.Queued;
                         _status?.Invoke("Searching for an opponent...", true);
@@ -195,7 +196,7 @@ namespace ArvinCombat
                 _sendTimer -= Time.unscaledDeltaTime;
                 if (_sendTimer <= 0f && _phase == Phase.InMatch)
                 {
-                    _sendTimer = 0.05f; // 20 Hz
+                    _sendTimer = 0.033f; // 30 Hz
                     _sock.Send(JsonUtility.ToJson(local.BuildNetState()));
                 }
                 if (_fighting) _timeLeft = Mathf.Max(0f, _timeLeft - Time.deltaTime);
@@ -290,12 +291,23 @@ namespace ArvinCombat
 
             DestroyFighters();
             local = FighterFactory.Create(myDef, myStats, null, _profile.playerName, true,
-                new PlayerBrain { cameraTransform = cam != null ? cam.transform : null }, MyStart, MyRot);
-            remote = FighterFactory.Create(oppDef, oppStats, null, _oppName, false, new IdleBrain(), OppStart, OppRot, true);
+                new PlayerBrain { cameraTransform = cam != null ? cam.transform : null }, MyStart, MyRot, false, _profile.equippedSkins[(int)myId]);
+            remote = FighterFactory.Create(oppDef, oppStats, null, _oppName, false, new IdleBrain(), OppStart, OppRot, true, m.oppSkin ?? "");
             local.opponent = remote;
             remote.opponent = local;
+            Stats = new FightStats();
+            Stats.Attach(local);
 
-            local.OnRemoteHit = (atk, dmg) => Send(new NetMsg { t = "hit", atk = atk.anim, dmg = dmg });
+            local.OnRemoteHit = (atk, dmg) =>
+            {
+                Send(new NetMsg { t = "hit", atk = atk.anim, dmg = dmg });
+                // instant feedback for the attacker; the real damage number arrives with "res"
+                if (remote != null)
+                {
+                    if (fx != null) fx.Spawn(remote.transform.position + Vector3.up * 1.3f * remote.stats.scale, false, dmg * 0.5f);
+                    if (cam != null) cam.Shake(Mathf.Clamp(dmg / 120f, 0.2f, 0.8f));
+                }
+            };
             local.OnDamaged += (victim, amount, point, blocked) =>
             {
                 ShowHitFx(point, amount, true, blocked);
@@ -337,6 +349,7 @@ namespace ArvinCombat
             _fighting = false;
             local.ResetForRound(MyStart, MyRot);
             remote.ResetRemote(OppStart, OppRot);
+            Stats.RoundStart();
             _timeLeft = _roundTime;
             if (cam != null) cam.Snap();
             if (ui != null) ui.CenterMessage(m.n > 1 && _myScore == _need - 1 && _oppScore == _need - 1 ? "FINAL ROUND" : "ROUND " + m.n, 1.6f);
@@ -375,6 +388,7 @@ namespace ArvinCombat
             Scores(m);
             bool iWon = m.w == _side;
             bool draw = m.w < 0;
+            Stats.RoundEnd(iWon, m.reason != "time");
             if (!local.IsDead) { if (iWon) local.SetVictory(); else local.SetFrozen(true); }
             string first = m.reason == "time" ? "TIME!" : "K.O.";
             string who = draw ? "DRAW" : (iWon ? local.fighterName : remote.fighterName) + " WINS THE ROUND";
@@ -415,15 +429,18 @@ namespace ArvinCombat
             var r = new MatchResult
             {
                 playerWon = won, playerRounds = _myScore, enemyRounds = _oppScore,
-                playerHealthLeft01 = local != null ? local.Health01 : 0f
+                playerHealthLeft01 = local != null ? local.Health01 : 0f,
+                stats = Stats
             };
             _onFinished?.Invoke(r, extra);
         }
 
         void ShowHitOnRemote(float amount, bool blocked)
         {
+            // spark + shake were already shown when the hit was sent; here only the confirmed number
             Vector3 point = remote.transform.position + Vector3.up * 1.3f * remote.stats.scale;
-            ShowHitFx(point, amount, false, blocked);
+            if (blocked && fx != null) fx.Spawn(point, true, amount);
+            if (ui != null && amount >= 1f) ui.DamageNumber(point, amount, false, blocked);
         }
 
         void ShowHitFx(Vector3 point, float amount, bool victimIsLocal, bool blocked)

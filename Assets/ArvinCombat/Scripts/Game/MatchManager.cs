@@ -17,6 +17,9 @@ namespace ArvinCombat
         public AIProfile ai = new AIProfile();
         public int roundsToWin = 2;
         public float roundTime = 75f;
+        public string playerSkin = "";
+        // campaign "continue": the fight resumes with these scores
+        public int startPlayerRounds, startEnemyRounds;
     }
 
     public class MatchResult
@@ -24,6 +27,7 @@ namespace ArvinCombat
         public bool playerWon;
         public int playerRounds, enemyRounds;
         public float playerHealthLeft01;
+        public FightStats stats = new FightStats();
     }
 
     /// <summary>Runs one fight: spawns both fighters, plays the rounds, reports the winner.</summary>
@@ -41,6 +45,7 @@ namespace ArvinCombat
         public float timeLeft { get; private set; }
         public bool running { get; private set; }
         public bool paused;
+        public FightStats Stats { get; private set; } = new FightStats();
 
         MatchSetup _setup;
         Action<MatchResult> _onFinished;
@@ -62,8 +67,10 @@ namespace ArvinCombat
             var pStats = RuntimeStats.Build(pDef, setup.playerRanks, 1f, null);
             var eStats = RuntimeStats.Build(eDef, setup.enemyRanks, setup.enemyDifficulty, setup.enemyTraits);
 
-            player = Spawn(pDef, pStats, null, setup.playerName, true, new PlayerBrain { cameraTransform = cam != null ? cam.transform : null }, PlayerStart, Quaternion.identity);
-            enemy = Spawn(eDef, eStats, setup.enemyTraits, setup.enemyName, false, new AIBrain(setup.ai), EnemyStart, Quaternion.Euler(0f, 180f, 0f));
+            player = Spawn(pDef, pStats, null, setup.playerName, true, new PlayerBrain { cameraTransform = cam != null ? cam.transform : null }, PlayerStart, Quaternion.identity, setup.playerSkin);
+            enemy = Spawn(eDef, eStats, setup.enemyTraits, setup.enemyName, false, new AIBrain(setup.ai), EnemyStart, Quaternion.Euler(0f, 180f, 0f), "");
+            Stats = new FightStats();
+            Stats.Attach(player);
             player.opponent = enemy;
             enemy.opponent = player;
 
@@ -86,9 +93,9 @@ namespace ArvinCombat
         }
 
         Fighter Spawn(WarriorDef def, RuntimeStats stats, EnemyTrait[] traits, string displayName, bool isPlayer,
-            IFighterBrain brain, Vector3 pos, Quaternion rot)
+            IFighterBrain brain, Vector3 pos, Quaternion rot, string skin)
         {
-            var f = FighterFactory.Create(def, stats, traits, displayName, isPlayer, brain, pos, rot);
+            var f = FighterFactory.Create(def, stats, traits, displayName, isPlayer, brain, pos, rot, false, skin);
             f.OnDamaged += HandleDamaged;
             f.OnPopup += (who, text) => { if (ui != null) ui.Popup(who, text); };
             return f;
@@ -118,9 +125,10 @@ namespace ArvinCombat
 
         IEnumerator MatchFlow()
         {
-            playerRounds = enemyRounds = 0;
-            round = 0;
             int need = Mathf.Max(1, _setup.roundsToWin);
+            playerRounds = Mathf.Clamp(_setup.startPlayerRounds, 0, need - 1);
+            enemyRounds = Mathf.Clamp(_setup.startEnemyRounds, 0, need - 1);
+            round = playerRounds + enemyRounds;
             if (ui != null) ui.ShowHud(true);
 
             while (playerRounds < need && enemyRounds < need && round < 9)
@@ -130,6 +138,7 @@ namespace ArvinCombat
                 enemy.ResetForRound(EnemyStart, Quaternion.Euler(0f, 180f, 0f));
                 if (cam != null) cam.Snap();
                 timeLeft = _setup.roundTime;
+                Stats.RoundStart();
 
                 if (ui != null) ui.CenterMessage(round == need * 2 - 1 && round > 1 ? "FINAL ROUND" : "ROUND " + round, 1.3f);
                 yield return new WaitForSeconds(1.4f);
@@ -150,6 +159,7 @@ namespace ArvinCombat
 
                 if (winner == player) playerRounds++;
                 else if (winner == enemy) enemyRounds++;
+                Stats.RoundEnd(winner == player, !timeOut);
 
                 _slowMo = !timeOut;
                 if (ui != null) ui.CenterMessage(timeOut ? "TIME!" : (winner == null ? "DOUBLE K.O." : "K.O."), 1.6f);
@@ -173,7 +183,8 @@ namespace ArvinCombat
             var result = new MatchResult
             {
                 playerWon = won, playerRounds = playerRounds, enemyRounds = enemyRounds,
-                playerHealthLeft01 = player != null ? player.Health01 : 0f
+                playerHealthLeft01 = player != null ? player.Health01 : 0f,
+                stats = Stats
             };
             running = false;
             Time.timeScale = 1f;

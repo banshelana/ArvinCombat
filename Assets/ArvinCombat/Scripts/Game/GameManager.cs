@@ -20,14 +20,21 @@ namespace ArvinCombat
 
         public PlayerProfile profile { get; private set; }
         public GamePlatformBridge platform { get; private set; }
+        public ArvinServices services { get; private set; }
         /// <summary>Logged in on the Arvin Games site: the name comes from the site and can't be edited.</summary>
         public bool NameFromSite => platform != null && platform.OnSite && !platform.IsGuest && !string.IsNullOrEmpty(platform.DisplayName);
         public PlayMode mode { get; private set; }
         int _currentLevel;
         MatchSetup _lastSetup;
+        MatchResult _lastResult;
+        int _lastXp;
+        string _lastExtra = "";
         bool _paused;
         bool _searching;
         bool _upgradesFromLevels;
+        bool _uiBuilt;
+        bool _cursorHeld;   // the game had the mouse captured
+        float _cursorHeldTime;
 
         void Awake()
         {
@@ -50,6 +57,23 @@ namespace ArvinCombat
             platform = GamePlatformBridge.Create();
             platform.OnReady += OnPlatformReady;
             platform.OnResumed += () => online.OnPlatformResumed();
+
+            // shop, achievements and cloud save
+            services = ArvinServices.Create(platform, profile, gameObject);
+            services.Changed += () => { if (_uiBuilt) ui.OnServicesChanged(); };
+            services.CloudApplied += OnCloudApplied;
+            services.AchievementUnlocked += title =>
+            {
+                // on the site the platform shows its own notification
+                if (_uiBuilt && !platform.OnSite) ui.Toast("ACHIEVEMENT UNLOCKED:  " + title);
+            };
+        }
+
+        /// <summary>A newer save came from the cloud (another device): keep the site name and refresh the menu.</summary>
+        void OnCloudApplied()
+        {
+            if (NameFromSite) { profile.playerName = platform.DisplayName; profile.SaveLocalOnly(); }
+            if (_uiBuilt && !match.running && !online.InMatch && (ui.CurrentScreen == "main" || ui.CurrentScreen == "")) ui.ShowMainMenu();
         }
 
         void OnPlatformReady()
@@ -63,21 +87,53 @@ namespace ArvinCombat
         void Start()
         {
             ui.Build(this);
+            _uiBuilt = true;
             ui.ShowMainMenu();
             platform.LoadingFinished();
         }
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape) && (match.running || online.InMatch)) SetPaused(!_paused);
+            bool inFight = match.running || online.InMatch;
+            if (Input.GetKeyDown(KeyCode.Escape) && inFight) SetPaused(!_paused);
+            UpdateCursor(inFight && !_paused);
 
             // slow orbit around the arena while in menus
             if (!match.running && match.player == null && !online.HasFighters && fightCamera != null)
             {
                 float a = Time.unscaledTime * 6f;
-                var pos = new Vector3(Mathf.Sin(a * Mathf.Deg2Rad) * 13f, 5.5f, Mathf.Cos(a * Mathf.Deg2Rad) * 13f);
+                var pos = new Vector3(Mathf.Sin(a * Mathf.Deg2Rad) * 9f, 3.6f, Mathf.Cos(a * Mathf.Deg2Rad) * 9f);
                 fightCamera.transform.position = pos;
                 fightCamera.transform.rotation = Quaternion.LookRotation(new Vector3(0, 1f, 0) - pos);
+            }
+        }
+
+        /// <summary>
+        /// During a fight the mouse is captured by the game (hidden, can't leave the game screen) and turns the camera.
+        /// If the browser releases it (Esc, tab switch) the pause menu opens; clicking Resume captures it again.
+        /// </summary>
+        void UpdateCursor(bool capture)
+        {
+            if (capture)
+            {
+                if (Cursor.lockState == CursorLockMode.Locked) { _cursorHeld = true; _cursorHeldTime += Time.unscaledDeltaTime; return; }
+                bool wasHeld = _cursorHeld && _cursorHeldTime > 0.5f;
+                _cursorHeldTime = 0f;
+                if (wasHeld)
+                {
+                    // lost the mouse without our Esc handler (browser took it back)
+                    _cursorHeld = false;
+                    SetPaused(true);
+                    return;
+                }
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+            else
+            {
+                _cursorHeld = false;
+                if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
+                if (!Cursor.visible) Cursor.visible = true;
             }
         }
 
@@ -103,6 +159,8 @@ namespace ArvinCombat
 
         public void SelectWarrior(WarriorId id)
         {
+            if (!services.WarriorUnlocked(id)) { UnlockWarrior(id); return; }
+            ui.SetSelectMessage("");
             profile.selectedWarrior = (int)id;
             profile.Save();
             switch (mode)
@@ -111,6 +169,28 @@ namespace ArvinCombat
                 case PlayMode.QuickFight: StartQuickFight(); break;
                 case PlayMode.Online: OpenOnline(); break;
             }
+        }
+
+        /// <summary>Locked warrior clicked: buy it in the shop (the site shows the confirm window).</summary>
+        public void UnlockWarrior(WarriorId id)
+        {
+            string key = GameContent.WarriorItem(id);
+            if (key == null) return;
+            ui.SetSelectMessage("Waiting for the site...");
+            services.Buy(key, (ok, err) =>
+            {
+                if (ok) { ui.SetSelectMessage(WarriorDatabase.Get(id).displayName + " unlocked!"); }
+                else ui.SetSelectMessage(ArvinServices.ErrorText(err));
+            });
+        }
+
+        WarriorId SelectedOrFree()
+        {
+            var w = (WarriorId)profile.selectedWarrior;
+            if (services.WarriorUnlocked(w)) return w;
+            profile.selectedWarrior = (int)WarriorId.Karate;
+            profile.Save();
+            return WarriorId.Karate;
         }
 
         public void OpenUpgrades(bool fromLevels)
@@ -132,9 +212,11 @@ namespace ArvinCombat
             var lvl = LevelDatabase.Levels[Mathf.Clamp(index, 0, LevelDatabase.Levels.Count - 1)];
             _currentLevel = lvl.index;
             mode = PlayMode.Campaign;
+            var pw = SelectedOrFree();
             var setup = new MatchSetup
             {
-                playerWarrior = (WarriorId)profile.selectedWarrior,
+                playerWarrior = pw,
+                playerSkin = services.EquippedSkin(pw),
                 playerName = profile.playerName,
                 playerRanks = profile.GetRanks((WarriorId)profile.selectedWarrior),
                 enemyWarrior = lvl.warrior,
@@ -152,9 +234,11 @@ namespace ArvinCombat
             mode = PlayMode.QuickFight;
             var enemyId = (WarriorId)Random.Range(0, WarriorDatabase.Count);
             var def = WarriorDatabase.Get(enemyId);
+            var pw = SelectedOrFree();
             var setup = new MatchSetup
             {
-                playerWarrior = (WarriorId)profile.selectedWarrior,
+                playerWarrior = pw,
+                playerSkin = services.EquippedSkin(pw),
                 playerName = profile.playerName,
                 playerRanks = profile.GetRanks((WarriorId)profile.selectedWarrior),
                 enemyWarrior = enemyId,
@@ -170,6 +254,7 @@ namespace ArvinCombat
         {
             _lastSetup = setup;
             _paused = false;
+            ui.SetResultMessage("");
             ui.HideMenus();
             platform.GameplayStart();
             match.StartMatch(setup, OnMatchFinished);
@@ -180,6 +265,8 @@ namespace ArvinCombat
             int xp;
             string extra = "";
             bool canNext = false;
+            bool canContinue = false;
+            _lastResult = r;
 
             if (r.playerWon) profile.wins++; else profile.losses++;
             platform.GameplayStop();
@@ -192,6 +279,7 @@ namespace ArvinCombat
                     bool firstClear = _currentLevel >= profile.highestLevelUnlocked;
                     xp = lvl.xpReward + (firstClear ? lvl.xpReward / 2 : 0);
                     if (r.playerHealthLeft01 > 0.8f) { xp += 25; extra = "Flawless bonus +25"; }
+                    profile.clearedMask |= 1 << _currentLevel;
                     if (firstClear)
                     {
                         profile.highestLevelUnlocked = Mathf.Min(LevelDatabase.Levels.Count - 1, _currentLevel + 1);
@@ -200,15 +288,60 @@ namespace ArvinCombat
                     }
                     canNext = _currentLevel < LevelDatabase.Levels.Count - 1;
                 }
-                else { xp = 15; extra = "Upgrade your warrior and try again."; }
+                else
+                {
+                    xp = 15;
+                    extra = "Upgrade your warrior and try again - or CONTINUE with your rounds kept.";
+                    canContinue = true;
+                }
+                platform.TrackEvent("LevelCompleted", "{\"level\":" + (_currentLevel + 1) + ",\"won\":" + (r.playerWon ? "true" : "false") + "}");
             }
             else
             {
                 xp = r.playerWon ? 40 : 10;
             }
 
+            services.OnFightFinished(r, _lastSetup.playerWarrior, false);
             profile.AddXp(xp); // also saves
-            ui.ShowResult(r, xp, canNext, extra);
+            _lastXp = xp;
+            _lastExtra = extra;
+            ui.ShowResult(r, xp, canNext, extra, canContinue);
+        }
+
+        /// <summary>
+        /// Campaign continue (shop item): the lost fight goes on with the player's rounds kept and the enemy one
+        /// round short of winning. Uses a continue the player owns, or buys one first.
+        /// </summary>
+        public void ContinueFight()
+        {
+            if (mode != PlayMode.Campaign || _lastSetup == null || _lastResult == null || services.Buying) return;
+            void Go()
+            {
+                services.UseContinue(ok =>
+                {
+                    if (!ok) { ui.SetResultMessage("Could not use the continue - try again."); ui.ShowResult(_lastResult, _lastXp, false, _lastExtra, true); return; }
+                    int need = Mathf.Max(1, _lastSetup.roundsToWin);
+                    _lastSetup.startPlayerRounds = Mathf.Clamp(_lastResult.playerRounds, 0, need - 1);
+                    _lastSetup.startEnemyRounds = need - 1;
+                    _lastSetup.playerRanks = profile.GetRanks(_lastSetup.playerWarrior);
+                    _lastSetup.playerSkin = services.EquippedSkin(_lastSetup.playerWarrior);
+                    platform.TrackEvent("ContinueUsed", "{\"level\":" + (_currentLevel + 1) + "}");
+                    SetPausedSilent(false);
+                    Begin(_lastSetup);
+                    _lastSetup.startPlayerRounds = _lastSetup.startEnemyRounds = 0; // RETRY later starts fresh
+                });
+            }
+            if (services.Continues > 0) { Go(); return; }
+            services.Buy(GameContent.ContinueItem, (ok, err) =>
+            {
+                if (ok) Go();
+                else { ui.SetResultMessage(ArvinServices.ErrorText(err)); ui.ShowResult(_lastResult, _lastXp, false, _lastExtra, true); }
+            });
+            if (services.Buying)
+            {
+                ui.SetResultMessage("Waiting for the site...");
+                ui.ShowResult(_lastResult, _lastXp, false, _lastExtra, true);
+            }
         }
 
         public void NextLevel() => StartLevel(_currentLevel + 1);
@@ -240,6 +373,7 @@ namespace ArvinCombat
 
         public void SetPaused(bool p)
         {
+            if (p) { _cursorHeld = false; Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
             SetPausedSilent(p);
             ui.ShowPause(p, mode == PlayMode.Online);
         }
@@ -256,6 +390,7 @@ namespace ArvinCombat
         public void OpenOnline()
         {
             mode = PlayMode.Online;
+            if (!services.WarriorUnlocked((WarriorId)profile.selectedWarrior)) { ChooseMode(PlayMode.Online); return; }
             _searching = false;
             ui.ShowOnline("Press FIND MATCH: you will be paired with an online player of a similar level.", false);
         }
@@ -277,6 +412,7 @@ namespace ArvinCombat
             platform.GameplayStop();
             platform.TrackEvent("MatchFinished", "{\"place\":" + (r.playerWon ? 1 : 2) + ",\"players\":2}");
             int xp = r.playerWon ? 60 : 15;
+            services.OnFightFinished(r, (WarriorId)profile.selectedWarrior, true);
             profile.AddXp(xp); // also saves
             ui.ShowResult(r, xp, false, extra);
         }

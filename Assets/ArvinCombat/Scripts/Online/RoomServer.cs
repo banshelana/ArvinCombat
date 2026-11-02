@@ -46,7 +46,7 @@ namespace ArvinCombat
             if (gm != null) gm.gameObject.SetActive(false);
             foreach (var c in FindObjectsByType<Camera>(FindObjectsSortMode.None)) c.enabled = false;
             foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) l.enabled = false;
-            Application.targetFrameRate = 30;
+            Application.targetFrameRate = 60;
             QualitySettings.vSyncCount = 0;
             new GameObject("RoomServer").AddComponent<RoomServer>();
         }
@@ -226,7 +226,19 @@ namespace ArvinCombat
                         {
                             string text = Encoding.UTF8.GetString(message.ToArray());
                             message.Clear();
-                            _main.Enqueue(() => OnMessage(c, text));
+                            // fast path: fighter state / hit results / popups go to the opponent right away
+                            // (not after the next server frame) -> less lag
+                            bool relayed = false;
+                            int side = c.side;
+                            if (side >= 0 && _phase != Phase.Done &&
+                                (text.StartsWith("{\"t\":\"st\"") || text.StartsWith("{\"t\":\"res\"") ||
+                                 text.StartsWith("{\"t\":\"pop\"") || text.StartsWith("{\"t\":\"cmd\"")))
+                            {
+                                var other = _players[1 - side];
+                                if (other != null && !other.closed) SendText(other, text);
+                                relayed = true;
+                            }
+                            _main.Enqueue(() => OnMessage(c, text, relayed));
                         }
                     }
                 }
@@ -370,7 +382,7 @@ namespace ArvinCombat
             if (other != null) Send(other, new NetMsg { t = "pop", txt = text });
         }
 
-        void OnMessage(Conn c, string text)
+        void OnMessage(Conn c, string text, bool relayed = false)
         {
             float tnow = Time.realtimeSinceStartup;
             c.lastSeen = tnow;
@@ -403,7 +415,7 @@ namespace ArvinCombat
                 case "st":
                     c.x = m.x; c.z = m.z;
                     if (m.mhp > 0f) { c.hp = m.hp; c.mhp = m.mhp; }
-                    if (other != null) SendText(other, text);
+                    if (other != null && !relayed) SendText(other, text);
                     break;
                 case "hit":
                     if (other != null && ValidHit(c, other, m)) SendText(other, text);
@@ -411,7 +423,7 @@ namespace ArvinCombat
                 case "res":
                 case "pop":
                 case "cmd":
-                    if (other != null) SendText(other, text);
+                    if (other != null && !relayed) SendText(other, text);
                     break;
                 case "dead":
                     if (_phase == Phase.Fight) EndRound(1 - c.side, "ko");

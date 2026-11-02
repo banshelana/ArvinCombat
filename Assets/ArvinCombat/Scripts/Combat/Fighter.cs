@@ -41,6 +41,10 @@ namespace ArvinCombat
         public event Action<Fighter> OnDeath;
         public event Action<Fighter, AttackData> OnMoveStarted;  // for the HUD move list
         public const int MaxChain = 4;                           // moves per combo before a breath
+        public event Action<Fighter> OnParry;                    // this fighter parried an attack
+        public event Action<Fighter, int> OnHitLanded;           // attacker, chain index (3 = 4th move of a combo)
+        public bool LastLandedSpecial { get; private set; }      // achievements: how the last hit was landed
+        public bool LastLandedJump { get; private set; }
 
         // online
         public bool isRemote;                                   // driven by network snapshots
@@ -50,6 +54,8 @@ namespace ArvinCombat
         float _netYaw;
         int _netSeq = -1;
         bool _netHasState;
+        Vector3 _netVel;
+        float _netTime;
 
         // action runtime
         AttackData _atk;
@@ -69,6 +75,10 @@ namespace ArvinCombat
         float _bleedTimer, _bleedDps;
         Fighter _bleedSource;
         bool _getUpPending;
+        // anti stun-lock: 3 hits in a row -> pushed away + 1 s untouchable
+        int _comboHits;
+        float _lastComboHit = -99f;
+        float _breakFreeUntil = -99f;
         float _height, _vy;          // jump physics (no rigidbody)
         Vector3 _airVel;
         bool _airAttacked, _airHitDone;
@@ -170,6 +180,7 @@ namespace ArvinCombat
 
         bool IsInvulnerable()
         {
+            if (Time.time < _breakFreeUntil) return true;
             if (state == FighterState.GetUp) return true;
             if (state == FighterState.Knockdown) return true;
             if (state == FighterState.Dodge)
@@ -220,6 +231,15 @@ namespace ArvinCombat
                     if (_t >= _dur) EndAction();
                     break;
                 case FighterState.HitStun:
+                    _t += dt;
+                    // escape a flinch half way: dodge or block
+                    if (_t >= _dur * 0.5f)
+                    {
+                        if (input.dodge && stamina >= DodgeCost()) { StartDodge(input.move); break; }
+                        if (input.block && stamina > 1f) { EnterBlock(); break; }
+                    }
+                    if (_t >= _dur) EndAction();
+                    break;
                 case FighterState.Stunned:
                     _t += dt;
                     if (_t >= _dur) EndAction();
@@ -392,6 +412,9 @@ namespace ArvinCombat
             if (d > reach) return false;
             if (d > 0.6f && Vector3.Angle(transform.forward, to) > atk.arc) return false;
 
+            LastLandedSpecial = atk == def.special;
+            LastLandedJump = atk == _airAtk;
+            OnHitLanded?.Invoke(this, comboIndex);
             float dmg = atk.damage * PowerNow();
             if (def.passive == PassiveType.ComboMaster && comboIndex > 0) dmg *= 1f + 0.1f * comboIndex;
             if (opponent.isRemote)
@@ -552,6 +575,7 @@ namespace ArvinCombat
                 if (Time.time - _blockStart <= def.parryWindow)
                 {
                     Popup("PARRY!");
+                    OnParry?.Invoke(this);
                     special = Mathf.Min(SpecialMax, special + 15f);
                     attacker.EnterStun(1.1f);
                     OnDamaged?.Invoke(this, 0f, transform.position + Vector3.up * 1.3f, true);
@@ -586,14 +610,19 @@ namespace ArvinCombat
             }
 
             _push = away * atk.knockback * pushMul / 0.15f;
+            if (Time.time - _lastComboHit > 1.2f) _comboHits = 0;
+            _comboHits++;
+            _lastComboHit = Time.time;
+            bool breakFree = _comboHits >= 3 && (atk.hitType == HitType.Light || atk.hitType == HitType.Heavy);
+
             bool armor = HasSuperArmor();
             switch (atk.hitType)
             {
                 case HitType.Light:
-                    if (!armor) EnterHitStun(0.4f);
+                    if (!armor) EnterHitStun(breakFree ? 0.2f : 0.28f);
                     break;
                 case HitType.Heavy:
-                    if (!armor) EnterHitStun(0.7f);
+                    if (!armor) EnterHitStun(breakFree ? 0.25f : 0.5f);
                     break;
                 case HitType.Knockdown:
                     if (!armor) EnterKnockdown(); else Popup("ARMOR");
@@ -604,6 +633,14 @@ namespace ArvinCombat
                 case HitType.Stun:
                     if (!armor) { EnterStun(1.6f); Popup("STUNNED"); }
                     break;
+            }
+            if (atk.hitType == HitType.Knockdown || atk.hitType == HitType.Grab) _comboHits = 0;
+            if (breakFree)
+            {
+                _comboHits = 0;
+                _breakFreeUntil = Time.time + 1.0f;
+                _push = away * 2.4f / 0.15f;
+                Popup("BREAK FREE");
             }
         }
 
@@ -732,7 +769,16 @@ namespace ArvinCombat
 
         public void ApplyRemoteState(NetMsg m)
         {
-            _netPos = new Vector3(m.x, m.y, m.z);
+            var newPos = new Vector3(m.x, m.y, m.z);
+            float tnow = Time.time;
+            if (_netHasState && tnow - _netTime > 0.005f)
+            {
+                var v = (newPos - _netPos) / (tnow - _netTime);
+                v.y = 0f;
+                _netVel = Vector3.ClampMagnitude(v, 14f);
+            }
+            _netTime = tnow;
+            _netPos = newPos;
             _netYaw = m.ry;
             if (!_netHasState) { transform.SetPositionAndRotation(_netPos, Quaternion.Euler(0f, _netYaw, 0f)); _netHasState = true; }
             state = (FighterState)m.s;
@@ -758,6 +804,8 @@ namespace ArvinCombat
         {
             ResetForRound(pos, rot);
             _netPos = pos;
+            _netVel = Vector3.zero;
+            _netTime = Time.time;
             _netYaw = rot.eulerAngles.y;
             _netHasState = true;
         }
@@ -765,9 +813,11 @@ namespace ArvinCombat
         void RemoteUpdate(float dt)
         {
             if (!_netHasState) return;
-            float k = 1f - Mathf.Exp(-14f * dt);
+            float k = 1f - Mathf.Exp(-20f * dt);
+            // predict a little ahead between snapshots (30 per second) to hide network delay
+            Vector3 target = _netPos + _netVel * Mathf.Min(Time.time - _netTime, 0.1f);
             Vector3 p = transform.position;
-            p = (p - _netPos).sqrMagnitude > 9f ? _netPos : Vector3.Lerp(p, _netPos, k);
+            p = (p - target).sqrMagnitude > 9f ? target : Vector3.Lerp(p, target, k);
             transform.SetPositionAndRotation(p, Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, _netYaw, 0f), k));
             if (anim != null && anim.current == "Locomotion") anim.SetLocomotion(anim.lastBlend, anim.lastMoveSpeed, dt);
         }

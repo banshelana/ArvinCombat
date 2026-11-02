@@ -166,7 +166,7 @@ namespace ArvinCombat.MatchService
 
                 var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
                 int myPort = port;
-                p.Exited += (_, __) => { _rooms.TryRemove(myPort, out _); _log.Write($"room {myPort} exited"); };
+                p.Exited += (s, e) => { _rooms.TryRemove(myPort, out _); _log.Write($"room {myPort} exited"); };
                 var info = new RoomInfo { Proc = p, Started = DateTime.UtcNow, LastHeartbeat = DateTime.MinValue };
                 if (!_rooms.TryAdd(port, info)) continue;
                 try
@@ -244,6 +244,7 @@ namespace ArvinCombat.MatchService
         public string PlayerId = "";
         public string Name = "Player";
         public int Warrior;
+        public string Skin = "";
         public int[] Ranks = new int[5];
         public int Rating;
         public bool Hello;
@@ -375,7 +376,7 @@ namespace ArvinCombat.MatchService
 
         object MatchMsg(int side, Player opp, int port, string ticket) => new
         {
-            t = "match", side, oppName = opp.Name, oppWarrior = opp.Warrior, oppRanks = opp.Ranks, oppRating = opp.Rating,
+            t = "match", side, oppName = opp.Name, oppWarrior = opp.Warrior, oppSkin = opp.Skin, oppRanks = opp.Ranks, oppRating = opp.Rating,
             rounds = RoundsToWin, roundTime = RoundTime, port, ticket, roomPath = _cfg.RoomPath
         };
 
@@ -448,6 +449,9 @@ namespace ArvinCombat.MatchService
                         p.Name = Clean(m["name"]?.GetValue<string>(), 16, "Player");
                         p.PlayerId = Clean(m["playerId"]?.GetValue<string>(), 64, "");
                         p.Warrior = Math.Clamp(m["warrior"]?.GetValue<int>() ?? 0, 0, 5);
+                        string skin = "";
+                        try { skin = m["skin"]?.GetValue<string>() ?? ""; } catch { }
+                        p.Skin = skin == "gold" || skin == "shadow" ? skin : "";
                         var ranks = new int[5];
                         if (m["ranks"] is JsonArray arr)
                             for (int i = 0; i < 5 && i < arr.Count; i++) ranks[i] = Math.Clamp(arr[i]?.GetValue<int>() ?? 0, 0, 10);

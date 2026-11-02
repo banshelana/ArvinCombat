@@ -1,0 +1,590 @@
+{
+  "format": "arvinplay.game-content",
+  "version": 1,
+  "achievements": [
+    {
+      "key": "first_win",
+      "title": {
+        "fa": "اولین خون",
+        "en": "First Blood"
+      },
+      "description": {
+        "fa": "اولین مبارزه را ببر",
+        "en": "Win your first fight"
+      },
+      "rarity": "common",
+      "points": 20,
+      "coinReward": 10,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "first_online_win",
+      "title": {
+        "fa": "اولین برد آنلاین",
+        "en": "Arena Debut"
+      },
+      "description": {
+        "fa": "اولین مسابقه آنلاین را ببر",
+        "en": "Win your first online match"
+      },
+      "rarity": "rare",
+      "points": 40,
+      "coinReward": 20,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "online_wins_10",
+      "title": {
+        "fa": "قهرمان آنلاین",
+        "en": "Online Champion"
+      },
+      "description": {
+        "fa": "۱۰ مسابقه آنلاین ببر",
+        "en": "Win 10 online matches"
+      },
+      "rarity": "epic",
+      "points": 120,
+      "coinReward": 60,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk",
+        "target": 10
+      }
+    },
+    {
+      "key": "campaign_level_5",
+      "title": {
+        "fa": "نیمه راه",
+        "en": "Halfway Through"
+      },
+      "description": {
+        "fa": "مرحله ۵ کمپین را ببر",
+        "en": "Beat campaign level 5"
+      },
+      "rarity": "rare",
+      "points": 50,
+      "coinReward": 20,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "campaign_complete",
+      "title": {
+        "fa": "شکست‌دهنده شوگان",
+        "en": "Shogun Slayer"
+      },
+      "description": {
+        "fa": "شوگان تاکدا را شکست بده و کمپین را تمام کن",
+        "en": "Defeat Shogun Takeda and finish the campaign"
+      },
+      "rarity": "legendary",
+      "points": 200,
+      "coinReward": 100,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "flawless_victory",
+      "title": {
+        "fa": "پیروزی بی‌نقص",
+        "en": "Flawless Victory"
+      },
+      "description": {
+        "fa": "یک راند را بدون آسیب دیدن ببر",
+        "en": "Win a round without taking any damage"
+      },
+      "rarity": "rare",
+      "points": 40,
+      "coinReward": 15,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "combo_master",
+      "title": {
+        "fa": "استاد ترکیب",
+        "en": "Combo Master"
+      },
+      "description": {
+        "fa": "یک ترکیب ۴ حرکتی بزن",
+        "en": "Land a 4-move combo"
+      },
+      "rarity": "common",
+      "points": 20,
+      "coinReward": 5,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "parry_25",
+      "title": {
+        "fa": "دیوار آهنین",
+        "en": "Iron Wall"
+      },
+      "description": {
+        "fa": "۲۵ حمله را دفع کامل کن",
+        "en": "Parry 25 attacks"
+      },
+      "rarity": "rare",
+      "points": 50,
+      "coinReward": 20,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk",
+        "target": 25
+      }
+    },
+    {
+      "key": "special_finish",
+      "title": {
+        "fa": "کارش را تمام کن",
+        "en": "Finish Him"
+      },
+      "description": {
+        "fa": "حریف را با حرکت ویژه ناک‌اوت کن",
+        "en": "Knock out an opponent with a special move"
+      },
+      "rarity": "rare",
+      "points": 40,
+      "coinReward": 15,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "air_finish",
+      "title": {
+        "fa": "مرگ از آسمان",
+        "en": "Death From Above"
+      },
+      "description": {
+        "fa": "حریف را با حمله پرشی ناک‌اوت کن",
+        "en": "Knock out an opponent with a jump attack"
+      },
+      "rarity": "rare",
+      "points": 40,
+      "coinReward": 15,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "comeback",
+      "title": {
+        "fa": "بازگشت",
+        "en": "Comeback"
+      },
+      "description": {
+        "fa": "بعد از باختن راند اول، مسابقه را ببر",
+        "en": "Win a match after losing the first round"
+      },
+      "rarity": "rare",
+      "points": 40,
+      "coinReward": 15,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "max_stat",
+      "title": {
+        "fa": "اوج قدرت",
+        "en": "Peak Power"
+      },
+      "description": {
+        "fa": "یکی از ویژگی‌های یک جنگجو را به رتبه ۱۰ برسان",
+        "en": "Upgrade any stat of a warrior to rank 10"
+      },
+      "rarity": "epic",
+      "points": 80,
+      "coinReward": 30,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "all_warriors",
+      "title": {
+        "fa": "استاد همه سبک‌ها",
+        "en": "Master of All Styles"
+      },
+      "description": {
+        "fa": "با هر شش جنگجو یک مبارزه ببر",
+        "en": "Win a fight with every warrior"
+      },
+      "rarity": "epic",
+      "points": 120,
+      "coinReward": 50,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk",
+        "target": 6
+      }
+    },
+    {
+      "key": "wins_100",
+      "title": {
+        "fa": "اسطوره زنده",
+        "en": "Living Legend"
+      },
+      "description": {
+        "fa": "۱۰۰ مبارزه ببر",
+        "en": "Win 100 fights"
+      },
+      "rarity": "legendary",
+      "points": 250,
+      "coinReward": 100,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "sdk",
+        "target": 100
+      }
+    },
+    {
+      "key": "untouchable",
+      "title": {
+        "fa": "دست‌نیافتنی",
+        "en": "Untouchable"
+      },
+      "description": {
+        "fa": "یک مسابقه کامل را بدون آسیب دیدن ببر",
+        "en": "Win a whole match without taking any damage"
+      },
+      "rarity": "legendary",
+      "points": 150,
+      "coinReward": 100,
+      "hidden": true,
+      "active": true,
+      "unlock": {
+        "type": "sdk"
+      }
+    },
+    {
+      "key": "one_hour",
+      "title": {
+        "fa": "یک ساعت مبارزه",
+        "en": "One Hour In"
+      },
+      "description": {
+        "fa": "یک ساعت بازی کن",
+        "en": "Play for one hour"
+      },
+      "rarity": "common",
+      "points": 15,
+      "coinReward": 0,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "playtime",
+        "minutes": 60
+      }
+    },
+    {
+      "key": "ten_games",
+      "title": {
+        "fa": "مبارز همیشگی",
+        "en": "Regular Fighter"
+      },
+      "description": {
+        "fa": "۱۰ بار بازی کن",
+        "en": "Play 10 times"
+      },
+      "rarity": "common",
+      "points": 10,
+      "coinReward": 0,
+      "hidden": false,
+      "active": true,
+      "unlock": {
+        "type": "plays",
+        "count": 10
+      }
+    }
+  ],
+  "storeItems": [
+    {
+      "key": "warrior_samurai",
+      "title": {
+        "fa": "سامورایی",
+        "en": "Samurai"
+      },
+      "description": {
+        "fa": "سامورایی را باز کن: شمشیر کاتانا، هر ضربه خونریزی دارد",
+        "en": "Unlock the Samurai: deadly katana, every cut bleeds"
+      },
+      "price": 300,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "warrior_spearman",
+      "title": {
+        "fa": "نیزه‌دار",
+        "en": "Spearman"
+      },
+      "description": {
+        "fa": "نیزه‌دار را باز کن: بلندترین برد در میدان",
+        "en": "Unlock the Spearman: the longest reach in the arena"
+      },
+      "price": 250,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "warrior_wrestler",
+      "title": {
+        "fa": "کشتی‌گیر",
+        "en": "Wrestler"
+      },
+      "description": {
+        "fa": "کشتی‌گیر را باز کن: تنومند و مقاوم با گرفتن غیرقابل دفع",
+        "en": "Unlock the Wrestler: huge, tough, unblockable takedowns"
+      },
+      "price": 350,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_samurai_gold",
+      "title": {
+        "fa": "سامورایی - طلایی",
+        "en": "Samurai - Gold"
+      },
+      "description": {
+        "fa": "ظاهر طلایی درخشان برای سامورایی",
+        "en": "A shining gold look for the Samurai"
+      },
+      "price": 200,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_samurai_shadow",
+      "title": {
+        "fa": "سامورایی - سایه",
+        "en": "Samurai - Shadow"
+      },
+      "description": {
+        "fa": "ظاهر تاریک سایه برای سامورایی",
+        "en": "A dark shadow look for the Samurai"
+      },
+      "price": 120,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_karate_gold",
+      "title": {
+        "fa": "استاد کاراته - طلایی",
+        "en": "Karate Master - Gold"
+      },
+      "description": {
+        "fa": "ظاهر طلایی درخشان برای استاد کاراته",
+        "en": "A shining gold look for the Karate Master"
+      },
+      "price": 200,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_karate_shadow",
+      "title": {
+        "fa": "استاد کاراته - سایه",
+        "en": "Karate Master - Shadow"
+      },
+      "description": {
+        "fa": "ظاهر تاریک سایه برای استاد کاراته",
+        "en": "A dark shadow look for the Karate Master"
+      },
+      "price": 120,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_spearman_gold",
+      "title": {
+        "fa": "نیزه‌دار - طلایی",
+        "en": "Spearman - Gold"
+      },
+      "description": {
+        "fa": "ظاهر طلایی درخشان برای نیزه‌دار",
+        "en": "A shining gold look for the Spearman"
+      },
+      "price": 200,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_spearman_shadow",
+      "title": {
+        "fa": "نیزه‌دار - سایه",
+        "en": "Spearman - Shadow"
+      },
+      "description": {
+        "fa": "ظاهر تاریک سایه برای نیزه‌دار",
+        "en": "A dark shadow look for the Spearman"
+      },
+      "price": 120,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_knight_gold",
+      "title": {
+        "fa": "شوالیه - طلایی",
+        "en": "Knight - Gold"
+      },
+      "description": {
+        "fa": "ظاهر طلایی درخشان برای شوالیه",
+        "en": "A shining gold look for the Knight"
+      },
+      "price": 200,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_knight_shadow",
+      "title": {
+        "fa": "شوالیه - سایه",
+        "en": "Knight - Shadow"
+      },
+      "description": {
+        "fa": "ظاهر تاریک سایه برای شوالیه",
+        "en": "A dark shadow look for the Knight"
+      },
+      "price": 120,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_boxer_gold",
+      "title": {
+        "fa": "بوکسور - طلایی",
+        "en": "Boxer - Gold"
+      },
+      "description": {
+        "fa": "ظاهر طلایی درخشان برای بوکسور",
+        "en": "A shining gold look for the Boxer"
+      },
+      "price": 200,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_boxer_shadow",
+      "title": {
+        "fa": "بوکسور - سایه",
+        "en": "Boxer - Shadow"
+      },
+      "description": {
+        "fa": "ظاهر تاریک سایه برای بوکسور",
+        "en": "A dark shadow look for the Boxer"
+      },
+      "price": 120,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_wrestler_gold",
+      "title": {
+        "fa": "کشتی‌گیر - طلایی",
+        "en": "Wrestler - Gold"
+      },
+      "description": {
+        "fa": "ظاهر طلایی درخشان برای کشتی‌گیر",
+        "en": "A shining gold look for the Wrestler"
+      },
+      "price": 200,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "skin_wrestler_shadow",
+      "title": {
+        "fa": "کشتی‌گیر - سایه",
+        "en": "Wrestler - Shadow"
+      },
+      "description": {
+        "fa": "ظاهر تاریک سایه برای کشتی‌گیر",
+        "en": "A dark shadow look for the Wrestler"
+      },
+      "price": 120,
+      "type": "permanent",
+      "active": true
+    },
+    {
+      "key": "xp_pack_small",
+      "title": {
+        "fa": "۱۵۰ قدرت تجربه",
+        "en": "XP Power x150"
+      },
+      "description": {
+        "fa": "۱۵۰ قدرت تجربه برای ارتقای جنگجوها",
+        "en": "+150 XP Power to upgrade your warriors"
+      },
+      "price": 30,
+      "type": "consumable",
+      "active": true
+    },
+    {
+      "key": "xp_pack_large",
+      "title": {
+        "fa": "۷۵۰ قدرت تجربه",
+        "en": "XP Power x750"
+      },
+      "description": {
+        "fa": "۷۵۰ قدرت تجربه برای ارتقای جنگجوها",
+        "en": "+750 XP Power to upgrade your warriors"
+      },
+      "price": 120,
+      "type": "consumable",
+      "active": true
+    },
+    {
+      "key": "continue",
+      "title": {
+        "fa": "ادامه کمپین",
+        "en": "Campaign Continue"
+      },
+      "description": {
+        "fa": "بعد از باختن یک مبارزه کمپین، از همان راند ادامه بده",
+        "en": "After losing a campaign fight, continue from the round you lost"
+      },
+      "price": 15,
+      "type": "consumable",
+      "active": true,
+      "maxPerUser": 200
+    }
+  ]
+}
